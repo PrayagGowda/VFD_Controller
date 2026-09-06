@@ -1,0 +1,142 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>VFD Control</title>
+</head>
+<body>
+
+<h2>VFD Control</h2>
+
+<input type="number" id="freq" placeholder="Frequency">
+<button onclick="setFreq()">Set Frequency</button>
+
+<br><br>
+
+<button onclick="sendCmd('f')">Forward</button>
+<button onclick="sendCmd('r')">Reverse</button>
+<button onclick="sendCmd('s')">Stop</button>
+
+<br><br>
+
+<button onclick="sendCmd('e')">Read Fault</button>
+<button onclick="sendCmd('d')">Drive Status</button>
+
+<br><br>
+
+<button onclick="sendCmd('c')">Command Frequency</button>
+<button onclick="sendCmd('h')">Output Frequency</button>
+<button onclick="sendCmd('i')">Output Current</button>
+<button onclick="sendCmd('v')">DC Bus Voltage</button>
+<button onclick="sendCmd('o')">Output Voltage</button>
+
+<br><br>
+
+<button onclick="sendCmd('m')">Multi Step Number</button>
+<button onclick="sendCmd('p')">PLC Step Number</button>
+<button onclick="sendCmd('t')">PLC Time</button>
+<button onclick="sendCmd('n')">Counter Value</button>
+
+<br><br>
+
+<input type="text" id="faultHigh" placeholder="High Byte (e.g. 00)">
+<input type="text" id="faultLow" placeholder="Low Byte (e.g. 0E)">
+
+<button onclick="testFault()">Test Fault</button>
+
+<br><br>
+
+<button onclick="clearLog()">Clear Log</button>
+
+<br><br>
+
+<pre id="log"></pre>
+
+<script>
+let port;
+let writer;
+
+function clearLog()
+{
+    document.getElementById("log").textContent = "";
+}
+
+async function connect()
+{
+    if (port) return;
+
+    port = await navigator.serial.requestPort();
+    await port.open({ baudRate: 115200 });
+    writer = port.writable.getWriter();
+    document.getElementById("log").textContent +=
+        "Connected\n";
+
+    readLoop();
+}
+
+async function sendCmd(cmd)
+{
+    document.getElementById("log").textContent +=
+        "\nSending: " + cmd + "\n";
+
+    await writer.write(
+        new TextEncoder().encode(cmd)
+    );
+}
+
+async function setFreq()
+{
+    let f = document.getElementById("freq").value;
+
+    document.getElementById("log").textContent +=
+        "\nSending: w" + f + "\n";
+
+    await writer.write(
+        new TextEncoder().encode("w" + f + "\n")
+    );
+}
+
+async function readLoop()
+{
+    const reader = port.readable.getReader();
+    let buffer = "";
+
+    while (true)
+    {
+        const { value, done } = await reader.read();
+        if (done) break;
+        buffer += new TextDecoder().decode(value);
+        let lines = buffer.split('\n');
+        buffer = lines.pop();
+
+        for (let line of lines)
+        {
+            line = line.trim();
+            if (line.startsWith('{') && line.endsWith('}'))
+            {
+                document.getElementById("log").textContent +=
+                    line + "\n";
+            }
+        }
+    }
+}
+
+async function testFault()
+{
+    let high = document.getElementById("faultHigh").value;
+    let low  = document.getElementById("faultLow").value;
+
+    document.getElementById("log").textContent +=
+        "\nSending: x " + high + " " + low + "\n";
+
+    await writer.write(
+        new TextEncoder().encode("x " + high + " " + low + "\n")
+    );
+}
+
+</script>
+
+<br><br>
+<button onclick="connect()">Connect ESP32</button>
+
+</body>
+</html>
